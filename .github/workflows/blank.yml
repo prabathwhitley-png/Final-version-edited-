@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Detect project type
+        id: detect
+        shell: bash
+        run: |
+          if [ -f package.json ]; then
+            echo "project=node" >> "$GITHUB_OUTPUT"
+          elif [ -f pom.xml ] || [ -f build.gradle ] || [ -f gradlew ]; then
+            echo "project=java" >> "$GITHUB_OUTPUT"
+          elif [ -f requirements.txt ] || [ -f pyproject.toml ] || [ -f setup.py ]; then
+            echo "project=python" >> "$GITHUB_OUTPUT"
+          elif [ -f Cargo.toml ]; then
+            echo "project=rust" >> "$GITHUB_OUTPUT"
+          else
+            echo "project=unknown" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Node.js
+        if: steps.detect.outputs.project == 'node'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Node dependencies
+        if: steps.detect.outputs.project == 'node'
+        shell: bash
+        run: |
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Run Node checks
+        if: steps.detect.outputs.project == 'node'
+        shell: bash
+        run: |
+          if npm run | grep -q "test"; then
+            npm test -- --runInBand
+          elif npm run | grep -q "build"; then
+            npm run build
+          else
+            echo "No test or build script defined; skipping Node validation."
+          fi
+
+      - name: Set up Java
+        if: steps.detect.outputs.project == 'java'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Run Java build
+        if: steps.detect.outputs.project == 'java'
+        shell: bash
+        run: |
+          if [ -f gradlew ]; then
+            chmod +x gradlew
+            ./gradlew build
+          elif [ -f pom.xml ]; then
+            mvn test
+          else
+            echo "No Java build tool found."
+          fi
+
+      - name: Set up Python
+        if: steps.detect.outputs.project == 'python'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        if: steps.detect.outputs.project == 'python'
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+
+      - name: Run Python checks
+        if: steps.detect.outputs.project == 'python'
+        shell: bash
+        run: |
+          if [ -f pytest.ini ] || [ -d tests ]; then
+            pytest -q
+          elif [ -f pyproject.toml ]; then
+            python -m compileall .
+          else
+            echo "No Python test configuration found."
+          fi
+
+      - name: Set up Rust
+        if: steps.detect.outputs.project == 'rust'
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Run Rust checks
+        if: steps.detect.outputs.project == 'rust'
+        shell: bash
+        run: cargo test --all-features
+
+      - name: No project detected
+        if: steps.detect.outputs.project == 'unknown'
+        shell: bash
+        run: |
+          echo "No supported project files were detected in this repository."
+          echo "Add project-specific build/test steps for your stack to complete CI."

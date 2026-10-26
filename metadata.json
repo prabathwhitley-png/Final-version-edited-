@@ -1,0 +1,6 @@
+{
+  "name": "ApexTrade",
+  "description": "Ultra-fast algorithmic trading bot platform with sub-millisecond order execution simulation, dynamic grid arbitrage, real-time depth telemetry, and AI signals.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
