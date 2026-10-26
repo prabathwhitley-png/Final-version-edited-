@@ -1,34 +1,43 @@
-name: Build Android APK
+name: Android CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "master" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "master" ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
+    # 1. කේතය (Code) ලබා ගැනීම
     - name: Checkout code
       uses: actions/checkout@v4
 
+    # 2. Java 17 ස්ථාපනය කිරීම සහ Gradle Cache කිරීම
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
-        cache: gradle
+        cache: 'gradle'
 
+    # 3. Gradle Setup (Cache සහ Daemon කළමනාකරණය සඳහා)
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+
+    # 4. gradlew ගොනුවට Execute කිරීමේ අවසරය ලබා දීම
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Build with Gradle
+    # 5. Debug APK එක Build කිරීම
+    - name: Build Debug APK
       run: ./gradlew assembleDebug
 
+    # 6. Build කළ APK එක Download කිරීමට Artifact ලෙස Save කිරීම
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: app-debug
-        path: app/build/outputs/apk/debug/app-debug.apk
+        name: app-debug-apk
+        path: app/build/outputs/apk/debug/*.apk
